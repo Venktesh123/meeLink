@@ -1,3 +1,4 @@
+// controllers/authController.js
 const googleMeetService = require("../services/googleMeetService");
 
 // Start OAuth2 flow
@@ -22,9 +23,35 @@ const oauth2Callback = async (req, res) => {
 
   try {
     console.log("Received OAuth callback with code");
-    await googleMeetService.getTokenFromCode(code);
+    const tokens = await googleMeetService.getTokenFromCode(code);
     console.log("Successfully exchanged code for tokens");
-    res.send("Authentication successful! You can close this window.");
+
+    // In a production environment, save tokens to database instead
+    if (process.env.NODE_ENV === "production") {
+      console.log(
+        "Please update GOOGLE_OAUTH_TOKEN environment variable with:",
+        JSON.stringify(tokens)
+      );
+    }
+
+    res.send(`
+      <html>
+        <body>
+          <h3>Authentication successful!</h3>
+          <p>You can close this window now.</p>
+          ${
+            process.env.NODE_ENV === "production"
+              ? "<p>IMPORTANT: Check your logs to update the GOOGLE_OAUTH_TOKEN environment variable.</p>"
+              : ""
+          }
+          <script>
+            setTimeout(() => {
+              window.close();
+            }, 3000);
+          </script>
+        </body>
+      </html>
+    `);
   } catch (error) {
     console.error("Error in OAuth callback:", error);
     res.status(500).json({ error: "Failed to complete authentication" });
@@ -34,7 +61,7 @@ const oauth2Callback = async (req, res) => {
 // Check if authenticated
 const checkAuthStatus = (req, res) => {
   try {
-    // Check if token file exists and is valid
+    // Check if OAuth client can be initialized with valid credentials
     const isAuthenticated = googleMeetService.initializeOAuthClient() !== null;
     console.log(
       "Authentication status check: ",

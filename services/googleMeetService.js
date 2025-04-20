@@ -1,3 +1,4 @@
+// services/googleMeetService.js
 const fs = require("fs");
 const { google } = require("googleapis");
 
@@ -13,19 +14,38 @@ let oAuth2Client;
 
 const initializeOAuthClient = () => {
   try {
-    const credentials = JSON.parse(fs.readFileSync("credentials.json"));
-    const { client_secret, client_id } = credentials.web;
+    // Get credentials from environment variables
+    const client_id = process.env.GOOGLE_CLIENT_ID;
+    const client_secret = process.env.GOOGLE_CLIENT_SECRET;
+    const redirect_uri =
+      process.env.GOOGLE_REDIRECT_URI ||
+      "https://mee-link.vercel.app/api/auth/oauth2callback";
+
+    if (!client_id || !client_secret) {
+      throw new Error(
+        "Missing Google OAuth credentials in environment variables"
+      );
+    }
 
     oAuth2Client = new google.auth.OAuth2(
       client_id,
       client_secret,
-      "https://mee-link.vercel.app/api/auth/oauth2callback"
+      redirect_uri
     );
 
     // Load existing token if it exists
-    if (fs.existsSync(TOKEN_PATH)) {
-      const token = JSON.parse(fs.readFileSync(TOKEN_PATH));
-      oAuth2Client.setCredentials(token);
+    try {
+      if (process.env.GOOGLE_OAUTH_TOKEN) {
+        const token = JSON.parse(process.env.GOOGLE_OAUTH_TOKEN);
+        oAuth2Client.setCredentials(token);
+      } else if (fs.existsSync(TOKEN_PATH)) {
+        const token = JSON.parse(fs.readFileSync(TOKEN_PATH));
+        oAuth2Client.setCredentials(token);
+      }
+    } catch (error) {
+      console.warn(
+        "No valid token found, OAuth2 initialization will require authentication"
+      );
     }
 
     return oAuth2Client;
@@ -65,7 +85,18 @@ const getTokenFromCode = async (code) => {
     console.log("Token expiry:", new Date(tokens.expiry_date).toLocaleString());
 
     // Save token for future use
-    fs.writeFileSync(TOKEN_PATH, JSON.stringify(tokens));
+    if (process.env.NODE_ENV !== "production") {
+      // In development, save to file
+      fs.writeFileSync(TOKEN_PATH, JSON.stringify(tokens));
+    } else {
+      // In production, you'll need to save this to a database or secure storage
+      // For now, let's log it so you can manually update your environment variables
+      console.log(
+        "IMPORTANT: Update GOOGLE_OAUTH_TOKEN with:",
+        JSON.stringify(tokens)
+      );
+    }
+
     return tokens;
   } catch (error) {
     console.error("Error retrieving access token:", error);
@@ -73,7 +104,7 @@ const getTokenFromCode = async (code) => {
   }
 };
 
-// Create Google Meet event with notifications
+// Rest of the file remains the same...
 const createGoogleMeet = async (
   subject,
   description,
@@ -182,6 +213,7 @@ const createGoogleMeet = async (
     throw new Error(`Failed to create meeting: ${error.message}`);
   }
 };
+
 module.exports = {
   initializeOAuthClient,
   getAuthUrl,
