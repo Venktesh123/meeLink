@@ -19,7 +19,7 @@ const initializeOAuthClient = () => {
     oAuth2Client = new google.auth.OAuth2(
       client_id,
       client_secret,
-      "https://mee-link.vercel.app/oauth2callback"
+      "https://mee-link.vercel.app/api/auth/oauth2callback"
     );
 
     // Load existing token if it exists
