@@ -19,7 +19,7 @@ const initializeOAuthClient = () => {
     const client_secret = process.env.GOOGLE_CLIENT_SECRET;
     const redirect_uri =
       process.env.GOOGLE_REDIRECT_URI ||
-      "https://mee-link.vercel.app/api/auth/oauth2callback";
+      "https://mee-link-rn36.vercel.app/api/auth/oauth2callback";
 
     if (!client_id || !client_secret) {
       throw new Error(
