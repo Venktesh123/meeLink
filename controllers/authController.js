@@ -79,39 +79,28 @@ const oauth2Callback = async (req, res) => {
             <h3>Authentication successful!</h3>
             <p>You can close this window now.</p>
             
-            ${
-              process.env.NODE_ENV === "production"
-                ? `<div class="instructions">
-                    <p><strong>IMPORTANT:</strong> Update your GOOGLE_OAUTH_TOKEN environment variable with the following value:</p>
-                    <code>${formattedToken}</code>
-                    <p>Make sure to copy the entire string as a single line with no extra spaces or quotes around it.</p>
-                   </div>`
-                : ""
-            }
+            <div class="instructions">
+              <p><strong>IMPORTANT:</strong> Update your GOOGLE_OAUTH_TOKEN environment variable with the following value:</p>
+              <code>${formattedToken}</code>
+              <p>Make sure to copy the entire string as a single line with no extra spaces or quotes around it.</p>
+            </div>
             
             <script>
-              // Copy the token to clipboard functionality
-              ${
-                process.env.NODE_ENV === "production"
-                  ? `
-                  function copyToken() {
-                    const tokenStr = '${formattedToken.replace(/'/g, "\\'")}';
-                    navigator.clipboard.writeText(tokenStr)
-                      .then(() => alert('Token copied to clipboard!'))
-                      .catch(err => console.error('Failed to copy: ', err));
-                  }
-                  
-                  // Add copy button after the page loads
-                  window.onload = function() {
-                    const codeBlock = document.querySelector('code');
-                    const btn = document.createElement('button');
-                    btn.textContent = 'Copy to Clipboard';
-                    btn.onclick = copyToken;
-                    btn.style.marginTop = '10px';
-                    codeBlock.parentNode.insertBefore(btn, codeBlock.nextSibling);
-                  };`
-                  : ""
+              function copyToken() {
+                const tokenStr = '${formattedToken.replace(/'/g, "\\'")}';
+                navigator.clipboard.writeText(tokenStr)
+                  .then(() => alert('Token copied to clipboard!'))
+                  .catch(err => console.error('Failed to copy: ', err));
               }
+              
+              window.onload = function() {
+                const codeBlock = document.querySelector('code');
+                const btn = document.createElement('button');
+                btn.textContent = 'Copy to Clipboard';
+                btn.onclick = copyToken;
+                btn.style.marginTop = '10px';
+                codeBlock.parentNode.insertBefore(btn, codeBlock.nextSibling);
+              };
             </script>
           </div>
         </body>

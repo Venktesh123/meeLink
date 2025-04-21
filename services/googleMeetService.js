@@ -96,7 +96,15 @@ class GoogleMeetService {
 
         // Parse the JSON token
         try {
-          return JSON.parse(tokenStr);
+          const parsedToken = JSON.parse(tokenStr);
+
+          // Add this section to log all token fields when running locally
+          if (process.env.NODE_ENV !== "production") {
+            console.log("📋 GOOGLE_OAUTH_TOKEN full contents:");
+            console.log(JSON.stringify(parsedToken, null, 2));
+          }
+
+          return parsedToken;
         } catch (parseError) {
           console.error("❌ Error parsing token JSON:", parseError);
 
@@ -105,7 +113,17 @@ class GoogleMeetService {
             // Try removing extra quotes that might be wrapping the JSON
             try {
               const unwrappedToken = tokenStr.substring(1, tokenStr.length - 1);
-              return JSON.parse(unwrappedToken);
+              const parsedToken = JSON.parse(unwrappedToken);
+
+              // Also log the unwrapped token in development
+              if (process.env.NODE_ENV !== "production") {
+                console.log(
+                  "📋 GOOGLE_OAUTH_TOKEN full contents (after unwrapping):"
+                );
+                console.log(JSON.stringify(parsedToken, null, 2));
+              }
+
+              return parsedToken;
             } catch (e) {
               console.error("❌ Failed to parse token after unwrapping quotes");
             }
