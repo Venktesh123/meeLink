@@ -26,29 +26,94 @@ const oauth2Callback = async (req, res) => {
     const tokens = await googleMeetService.getTokenFromCode(code);
     console.log("Successfully exchanged code for tokens");
 
-    // In a production environment, save tokens to database instead
+    // Format token for environment variable - create a single line JSON string
+    const formattedToken = JSON.stringify(tokens);
+
+    // In a production environment, save tokens to database or display for manual configuration
     if (process.env.NODE_ENV === "production") {
       console.log(
         "Please update GOOGLE_OAUTH_TOKEN environment variable with:",
-        JSON.stringify(tokens)
+        formattedToken
       );
     }
 
     res.send(`
       <html>
+        <head>
+          <title>Authentication Successful</title>
+          <style>
+            body {
+              font-family: Arial, sans-serif;
+              max-width: 800px;
+              margin: 40px auto;
+              padding: 20px;
+              line-height: 1.6;
+            }
+            .container {
+              border: 1px solid #ddd;
+              padding: 20px;
+              border-radius: 5px;
+            }
+            h3 {
+              color: #4CAF50;
+            }
+            code {
+              background: #f4f4f4;
+              padding: 5px 10px;
+              border-radius: 4px;
+              display: block;
+              overflow-x: auto;
+              white-space: nowrap;
+              font-size: 14px;
+              margin: 15px 0;
+            }
+            .instructions {
+              margin-top: 20px;
+              padding-top: 20px;
+              border-top: 1px solid #eee;
+            }
+          </style>
+        </head>
         <body>
-          <h3>Authentication successful!</h3>
-          <p>You can close this window now.</p>
-          ${
-            process.env.NODE_ENV === "production"
-              ? "<p>IMPORTANT: Check your logs to update the GOOGLE_OAUTH_TOKEN environment variable.</p>"
-              : ""
-          }
-          <script>
-            setTimeout(() => {
-              window.close();
-            }, 3000);
-          </script>
+          <div class="container">
+            <h3>Authentication successful!</h3>
+            <p>You can close this window now.</p>
+            
+            ${
+              process.env.NODE_ENV === "production"
+                ? `<div class="instructions">
+                    <p><strong>IMPORTANT:</strong> Update your GOOGLE_OAUTH_TOKEN environment variable with the following value:</p>
+                    <code>${formattedToken}</code>
+                    <p>Make sure to copy the entire string as a single line with no extra spaces or quotes around it.</p>
+                   </div>`
+                : ""
+            }
+            
+            <script>
+              // Copy the token to clipboard functionality
+              ${
+                process.env.NODE_ENV === "production"
+                  ? `
+                  function copyToken() {
+                    const tokenStr = '${formattedToken.replace(/'/g, "\\'")}';
+                    navigator.clipboard.writeText(tokenStr)
+                      .then(() => alert('Token copied to clipboard!'))
+                      .catch(err => console.error('Failed to copy: ', err));
+                  }
+                  
+                  // Add copy button after the page loads
+                  window.onload = function() {
+                    const codeBlock = document.querySelector('code');
+                    const btn = document.createElement('button');
+                    btn.textContent = 'Copy to Clipboard';
+                    btn.onclick = copyToken;
+                    btn.style.marginTop = '10px';
+                    codeBlock.parentNode.insertBefore(btn, codeBlock.nextSibling);
+                  };`
+                  : ""
+              }
+            </script>
+          </div>
         </body>
       </html>
     `);
