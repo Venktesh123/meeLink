@@ -1,77 +1,98 @@
-const fs = require("fs");
-const path = require("path");
 const { google } = require("googleapis");
-require("dotenv").config(); // Ensure environment variables are loaded
-
-// OAuth Scopes
-const SCOPES = [
-  "https://www.googleapis.com/auth/calendar",
-  "https://www.googleapis.com/auth/calendar.events",
-];
+require("dotenv").config();
 
 class GoogleMeetService {
   constructor() {
     this.oAuth2Client = null;
-    this.credentialsPath = path.join(process.cwd(), "credentials.json");
-    this.tokenPath = path.join(process.cwd(), "token.json");
   }
 
-  // Validate environment variables
-  validateCredentials() {
-    const { GOOGLE_CLIENT_ID, GOOGLE_CLIENT_SECRET, GOOGLE_REDIRECT_URI } =
-      process.env;
+  // Create credentials object from environment variables
+  getCredentials() {
+    const {
+      GOOGLE_CREDENTIALS_CLIENT_ID,
+      GOOGLE_CREDENTIALS_CLIENT_SECRET,
+      GOOGLE_CREDENTIALS_REDIRECT_URIS,
+    } = process.env;
 
-    if (!GOOGLE_CLIENT_ID) {
-      console.error("❌ GOOGLE_CLIENT_ID is missing");
-      throw new Error("GOOGLE_CLIENT_ID is required");
+    // Validate credentials
+    if (!GOOGLE_CREDENTIALS_CLIENT_ID) {
+      throw new Error("Google Client ID is missing");
+    }
+    if (!GOOGLE_CREDENTIALS_CLIENT_SECRET) {
+      throw new Error("Google Client Secret is missing");
     }
 
-    if (!GOOGLE_CLIENT_SECRET) {
-      console.error("❌ GOOGLE_CLIENT_SECRET is missing");
-      throw new Error("GOOGLE_CLIENT_SECRET is required");
-    }
+    // Parse redirect URIs (support multiple URIs)
+    const redirectUris = GOOGLE_CREDENTIALS_REDIRECT_URIS
+      ? GOOGLE_CREDENTIALS_REDIRECT_URIS.split(",").map((uri) => uri.trim())
+      : ["https://mee-link-m36.vercel.app/api/auth/oauth2callback"];
 
-    if (!GOOGLE_REDIRECT_URI) {
-      console.error("❌ GOOGLE_REDIRECT_URI is missing");
-      throw new Error("GOOGLE_REDIRECT_URI is required");
-    }
+    return {
+      web: {
+        client_id: GOOGLE_CREDENTIALS_CLIENT_ID,
+        client_secret: GOOGLE_CREDENTIALS_CLIENT_SECRET,
+        redirect_uris: redirectUris,
+      },
+    };
   }
 
-  // Initialize OAuth2 Client
+  // Initialize OAuth Client
   initializeOAuthClient() {
     try {
-      // Validate credentials first
-      this.validateCredentials();
+      const credentials = this.getCredentials();
+      const { client_id, client_secret, redirect_uris } = credentials.web;
 
-      const { GOOGLE_CLIENT_ID, GOOGLE_CLIENT_SECRET, GOOGLE_REDIRECT_URI } =
-        process.env;
-
+      // Create OAuth2 client
       const client = new google.auth.OAuth2(
-        GOOGLE_CLIENT_ID,
-        GOOGLE_CLIENT_SECRET,
-        GOOGLE_REDIRECT_URI
+        client_id,
+        client_secret,
+        redirect_uris[0]
       );
 
-      // Try to load existing token
-      try {
-        if (process.env.GOOGLE_OAUTH_TOKEN) {
-          const token = JSON.parse(process.env.GOOGLE_OAUTH_TOKEN);
-          client.setCredentials(token);
-        } else if (fs.existsSync(this.tokenPath)) {
-          const token = JSON.parse(fs.readFileSync(this.tokenPath));
-          client.setCredentials(token);
-        }
-      } catch (tokenError) {
-        console.warn(
-          "No valid token found. Authentication will be required.",
-          tokenError
-        );
+      // Retrieve and set token
+      const token = this.getTokenFromEnvOrFile();
+
+      // Validate token
+      if (!token.access_token || !token.refresh_token) {
+        throw new Error("Invalid token structure");
       }
+
+      // Set credentials
+      client.setCredentials(token);
+
+      // Log token details (without exposing sensitive information)
+      console.log("✅ OAuth Client Initialized");
+      console.log("Token Details:");
+      console.log(
+        "- Access Token: " + (token.access_token ? "Present ✓" : "Missing ✗")
+      );
+      console.log(
+        "- Refresh Token: " + (token.refresh_token ? "Present ✓" : "Missing ✗")
+      );
+      console.log(
+        "- Expiry Date: " + new Date(token.expiry_date).toLocaleString()
+      );
 
       return client;
     } catch (error) {
-      console.error("OAuth Client Initialization Error:", error.message);
+      console.error("🚨 OAuth Initialization Error:", error);
       throw error;
+    }
+  }
+
+  // Secure token retrieval method
+  getTokenFromEnvOrFile() {
+    try {
+      // Priority 1: Environment Variable
+      if (process.env.GOOGLE_OAUTH_TOKEN) {
+        console.log("🔑 Using token from environment variable");
+        return JSON.parse(process.env.GOOGLE_OAUTH_TOKEN);
+      }
+
+      throw new Error("No valid token found");
+    } catch (error) {
+      console.error("❌ Token Retrieval Error:", error);
+      throw new Error("Failed to retrieve OAuth token");
     }
   }
 
@@ -81,38 +102,33 @@ class GoogleMeetService {
       const client = this.initializeOAuthClient();
       return client.generateAuthUrl({
         access_type: "offline",
-        scope: SCOPES,
+        scope: [
+          "https://www.googleapis.com/auth/calendar",
+          "https://www.googleapis.com/auth/calendar.events",
+        ],
         prompt: "consent",
       });
     } catch (error) {
-      console.error("Error generating auth URL:", error);
+      console.error("Auth URL Generation Error:", error);
       throw error;
     }
   }
 
-  // Exchange Code for Tokens
+  // Token Exchange Method
   async getTokenFromCode(code) {
     try {
-      const client = this.initializeOAuthClient();
+      const credentials = this.getCredentials();
+      const { client_id, client_secret, redirect_uris } = credentials.web;
+
+      const client = new google.auth.OAuth2(
+        client_id,
+        client_secret,
+        redirect_uris[0]
+      );
+
       const { tokens } = await client.getToken(code);
 
-      // Log token details for debugging
-      console.log("Token Details:");
-      console.log(
-        "Access Token:",
-        tokens.access_token ? "Received" : "Missing"
-      );
-      console.log(
-        "Refresh Token:",
-        tokens.refresh_token ? "Received" : "Missing"
-      );
-      console.log("Expiry:", new Date(tokens.expiry_date).toLocaleString());
-
-      // Save tokens locally for development
-      if (process.env.NODE_ENV !== "production") {
-        fs.writeFileSync(this.tokenPath, JSON.stringify(tokens));
-      }
-
+      console.log("✅ Tokens exchanged successfully");
       return tokens;
     } catch (error) {
       console.error("Token Exchange Error:", error);
@@ -120,7 +136,7 @@ class GoogleMeetService {
     }
   }
 
-  // Additional methods for Meet creation would follow...
+  // Additional methods (createGoogleMeet, etc.) would follow similar patterns
 }
 
 module.exports = new GoogleMeetService();
